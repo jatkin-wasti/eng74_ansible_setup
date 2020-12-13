@@ -1,11 +1,21 @@
 # IAC Ansible
 Ansible is an IAC Configuration management tool
 ## How it works
+- Infrastructure as code allows developers to provision environments in minutes
+using code
+- Once this code has been written, it can be ran on one or more virtual machines
+and it will automatically build the environment to the given specifications
+- This assures environment consistency in a simple and fast way that can be
+reused or adapted when needed
 
+![IAC in DevOps](/images/DevOps-with-and-without-IaC.jpg)
 ## How to set it up
-- We are setting up our controller machine in AWS. Ansible_bash.sh is a script that will install ansible & associated dependencies.
+- We are setting up our controller machine in AWS
+- Ansible_bash.sh is a script that will install ansible & associated dependencies.
+- We can then write playbooks containing the code to provision our VM's
 ### Host file
-- General syntax specifying how to connect to a host
+- General syntax specifying how to connect to a host in the hosts file (found
+  in /etc/ansible)
 ```
 [name of host]
 <ip> ansible_connection=ssh ansible_ssh_private_key_file=/path/to/key
@@ -16,7 +26,6 @@ Ansible is an IAC Configuration management tool
 172.31.39.173 ansible_connection=ssh ansible_ssh_private_key_file=/home/ubuntu/.ssh/eng74-jamie-aws-key.pem
 ```
 ## Main sections
-
 ## Main commands
 - Ping all hosts
 `ansible all -m ping`
@@ -44,7 +53,10 @@ Ansible is an IAC Configuration management tool
 
 ## Writing a Playbook
 ### Main Structure
-
+- Define host
+- Define variables if there are any
+- Specify tasks to complete
+- Create handlers to be able to have conditional tasks
 ## Writing a Task / How to Provision
 ### Packages
 **Syntax for installing apt packages**
@@ -130,8 +142,6 @@ older method of installing npm packages
     dest: /destination/
     remote_src: yes
 ```
-**How to online copy across folders**
-
 **How to synchronise folders**
 ```YAML
 - name: Sycning directory
@@ -179,9 +189,9 @@ this can be after all the tasks have been defined
 ```
 ### Using Templates
 - The template module can be used to accomplish polymorphism in our playbooks
-- We can construct text files that hold all the configuration settings needed to
-setup various systems with specifics replaced with {{variables}} to be determined
-later
+- We can construct text or mark up files that hold all the configuration
+settings needed to setup various systems with specifics replaced with
+{{variables}} to be determined later
 - When using the module we need src (source of template file) and dest (destination
   path)
 - At execution time, the playbook replaces the variables in the template file
@@ -212,5 +222,53 @@ Hello
 No change in this line
 My first playbook using the template
 ```
-
+- Can use {% %} to replace functions instead of variables
 ## Configuring a server
+```YAML
+# This is going to be our playbook to provision the environment to run the db
+
+# Your YAML file starts after three dashes (---)
+
+---
+# This targets db_server
+
+- hosts: db_server
+# used to define where this playbook will run
+
+  gather_facts: yes
+# gathers facts/state of machine before running the playbook
+  become: true
+# become is used as the root permissions to perform tasks
+
+  tasks:
+    - name: Retrieving key
+      become: yes
+      shell: |
+          apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv D68FA50FEA312927
+          echo "deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list
+
+    - name: Update apt-get repo and cache
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+    - name: install mongodb
+      apt: pkg=mongodb-org state=latest update_cache=yes
+
+    - name: Install mongodb
+      apt:
+        name: mongodb
+        state: present
+        update_cache: yes
+
+    - name: start and enable mongodb
+      service:
+        name: mongodb
+        state: started
+        enabled: yes
+
+    - name: edit mongod config file
+      become: yes
+      shell: |
+          sed -i 's/127.0.0.1/0.0.0.0/g' mongod.conf
+      args:
+        chdir: /home/ubuntu/etc
+```
