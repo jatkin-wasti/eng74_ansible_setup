@@ -272,3 +272,123 @@ My first playbook using the template
       args:
         chdir: /home/ubuntu/etc
 ```
+## API keys and authentication security
+**Things to consider**
+- Is it protected from going online (in the .gitignore or even placed in a
+  different location)
+- Is it segregated from my code that goes online (Environment variables)
+- Is it encrypted (services like Ansible Vault)
+- How hard is it to share with colleagues (Hashicorp Vault)
+**gitignore**
+- Is it protected from going online **YES**
+- Is it segregated from my code that goes online **NO**
+- Is it encrypted **NO**
+- Is it easy to share with colleagues **NO**
+
+**Environment Variables**
+- Is it protected from going online **YES**
+- Is it segregated from my code that goes online **YES**
+- Is it encrypted **NO**
+- Is it easy to share with colleagues **NO**
+
+**Ansible Vault**
+- Is it protected from going online **YES**
+- Is it segregated from my code that goes online **YES**
+- Is it encrypted **YES**
+- Is it easy to share with colleagues **NO**
+## Ansible Vault
+
+![Ansible Vault](/images/ansible_vault.png)
+- Can take files that are in an area of risk e.g. secret keys, user id's, IP's
+etc. and encrypts them
+- These vaults should be offline for obvious reasons
+- For ansible to automatically read from the file we need to place this file in
+the /etc/ansible/ directory
+- To create an ansible vault
+```YAML
+ansible-vault create file_name.yaml
+```
+- Once you assign a password for it, it will open the file in vim
+- Remember you have to press `i` to insert text into the file and then once you
+are done, press escape followed by `:wq` and press enter to save it (`:q!` exits
+  without saving)
+- You can cat this file to see that the output is encrypted
+- To edit the file we run
+```YAML
+ansible-vault edit file_name.yaml
+```
+- Can also view the contents of the file unencryped with
+```YAML
+ansible-vault view file_name.yaml
+```
+## EC2 Module
+- Here is an example of how to create a provision file that uses variables, some
+of which are defined within the playbook itself and some of which are defined
+and kept secure in our ansible vault file
+-
+```YAML
+---
+- hosts: local
+  connection: local
+  gather_facts: true
+  become: true
+  vars:
+    key_name: your-key-name
+    region: eu-west-1
+    image: ami-0dc8d444ee2a42d8a
+    id: "Jamie Ansible ec2 lesson"
+    sec_group: sg-8a7f9ag7aghah
+    subnet_id: subnet-098fa865gfa7g6a
+    # ansible_python_interpreter: /urs/bin/python3
+
+  tasks:
+    - name: Installing dependencies
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python-pip
+        state: present
+
+    - name: Installing pip dependencies
+      pip:
+        name:
+          - boto
+          - boto3
+          - nose
+          - tornado
+          - awscli
+        state: present
+
+    - name: get instance facts
+      ec2_instance_facts:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ region }}"
+      register: result
+
+    - name: create ec2 instance
+      ec2:
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        assign_public_ip: true
+        key_name: "{{ key_name }}"
+        id: "{{ id }}"
+        vpc_subnet_id: "{{ subnet_id }}"
+        group_id: "{{ sec_group }}"
+        image: "{{ image }}"
+        instance_type: t2.micro
+        region: "{{ region }}"
+        wait: true
+        count: 1
+        instance_tags:
+          Name: suitable-instance-name
+
+  tags: ['never', 'create_ec2']
+```
+- To run this file we need to run the following command
+```YAML
+ansible-playbook playbook_name.yaml --ask-vault-pass --tags create_ec2
+```
+- Provide the ansible vault password we created earlier and your instance should
+be created to our defined specifications!
